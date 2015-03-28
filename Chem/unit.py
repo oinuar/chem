@@ -1,11 +1,16 @@
 from molecule import Molecule
 from collections import Counter
-from copy import deepcopy
 
 class Unit:
-   def __init__(self, molecule, n=1):
+   def __init__(self, molecule, ratio=1):
       self.__molecule = molecule
-      self.__n = n
+      self.__n = ratio
+      
+      if not isinstance(self.__n, int):
+         raise TypeError("'ratio' must be integer")
+      
+      if self.__n <= 0:
+         raise ValueError("'ratio' cannot be negative or zero")
       
    @property
    def ratio(self):
@@ -14,6 +19,9 @@ class Unit:
    @property
    def molecule(self):
       return self.__molecule
+      
+   def copy(self, n):
+      return Unit(self.molecule, n)
       
    def accept(self, visitor):
       return visitor.visit_unit(self)
@@ -27,7 +35,7 @@ class Unit:
             yield x
 
    def __str__(self):
-      return "{0}{1}".format(self.ratio, str(self.molecule))
+      return "{0}{1}".format(self.ratio if self.ratio != 1 else "", str(self.molecule))
       
    def __repr__(self):
       return repr(map(repr, self))
@@ -38,6 +46,9 @@ class Reagent(Unit):
 
    def accept(self, visitor):
       return visitor.visit_reagent(self)
+      
+   def copy(self, n):
+      return Reagent(self.molecule, n)
       
    def __add__(self, x):
       if not isinstance(x, Reagent):
@@ -80,6 +91,9 @@ class Product(Unit):
    
    def accept(self, visitor):
       return visitor.visit_product(self)
+      
+   def copy(self, n):
+      return Product(self.molecule, n)
       
    def __add__(self, x):
       if not isinstance(x, Product):
@@ -124,87 +138,56 @@ class Equation:
       return self.__product
    
    def balance(self):
-      class Collector(UnitVisitor):
-         def __init__(self):
-            self.__variables = []
-            self.__domain = set()
-     
-         @property
-         def variables(self):
-            return self.__variables
-            
-         @property
-         def domain(self):
-            return self.__domain
-     
-         def __collect(self, x):   
-            self.__variables.append(x)
-            self.__domain.add(x.ratio)
-            self.__domain.update(Counter(x).values())
-            return x
-     
-         def visit_reagent(self, x):
-            return self.__collect(x)
-            
-         def visit_product(self, x):
-            return self.__collect(x)
-     
-      def backtrace(csp, assignment, variable_set):
-         if is_complete(assignment):
-            return assignment
+      variables = []
+      variable_set = set()
+      domain = set()
+   
+      def collector(x):
+         variables.append(x)
+         domain.add(x.ratio)
+         domain.update(Counter(x).values())
+   
+      def backtrace(assignment):
+         eq = make_equation_for_assignment(assignment)
+      
+         if eq:
+            return eq
          
          s = variable_set ^ set(x[0] for x in assignment)
          
          if s:
             k = s.pop()
+            variable = variables[k]
             
-            variable = csp.variables[k]
-            
-            for value in csp.domain:
-               result = backtrace(csp, assignment + [(k, variable, value)], variable_set)
+            for value in domain:
+               result = backtrace(assignment + [(k, variable, value)])
                
-               if result is not None:
+               if result:
                   return result
-            
+
          return None
       
-      def is_complete(assignment):
-         """ The assignment is complete if both sides are equal """
-         map = {}
+      def make_equation_for_assignment(assignment):
+         units = [variable.copy(ratio) for (k, variable, ratio) in assignment]
+         reagents = [x for x in units if isinstance(x, Reagent)]
+         products = [x for x in units if isinstance(x, Product)]
          
-         if not assignment:
-            return False
-         
-         for (k, variable, ratio) in assignment:
-            new_unit = Unit(variable.molecule, ratio)
-            factor = 0
-            
-            if isinstance(variable, Reagent):
-               factor = -1
-            elif isinstance(variable, Product):
-               factor = 1
-            
-            for y in new_unit:
-               if y in map:
-                  map[y] += factor
-               else:
-                  map[y] = factor
+         if not reagents or not products:
+            return None
 
-         return all(x == 0 for x in map.values())
+         return Equation(reduce(CompoundReagent, reagents), reduce(CompoundProduct, products))
       
-      collector = Collector()
-      eq = deepcopy(self)
+      visitor = UnitVisitor(collector)
       
-      eq.reagent.accept(collector)
-      eq.product.accept(collector)
+      self.reagent.accept(visitor)
+      self.product.accept(visitor)
       
-      assignment = backtrace(collector, [], set(x for x in range(0, len(collector.variables))))
+      variable_set.update(x for x in range(0, len(variables)))
       
-      if not assignment:
-         raise Error("Equation {0} cannot be balanced".format(str(eq)))
+      eq = backtrace([])
       
-      for (k, variable, ratio) in assignment:
-         variable.ratio = ratio
+      if not eq:
+         raise Exception("Equation '{0}' cannot be balanced".format(str(self)))
       
       return eq
    
@@ -223,6 +206,9 @@ class Equation:
             return False
 
       return True
+
+   def __nonzero__(self):
+      return self.__bool__()
       
    def __str__(self):
       return "{0} -> {1}".format(str(self.reagent), str(self.product))
@@ -230,12 +216,12 @@ class Equation:
    def __repr__(self):
       return "{0} -> {1}".format(repr(self.reagent), repr(self.product))
 
-class UnitVisitor:
+class Visitor:
    def visit_unit(self, x):
       return x
    
    def visit_reagent(self, x):
-      return x
+      return self.visit_unit(x)
       
    def visit_compound_reagent(self, x):
       lhs = x.left.accept(self)
@@ -247,7 +233,7 @@ class UnitVisitor:
       return x
    
    def visit_product(self, x):
-      return x
+      return self.visit_unit(x)
    
    def visit_compound_product(self, x):
       lhs = x.left.accept(self)
@@ -256,4 +242,13 @@ class UnitVisitor:
       if lhs != x.left or rhs != x.right:
          return CompoundProduct(lhs, rhs)
       
-      return x      
+      return x
+      
+class UnitVisitor(Visitor):
+   def __init__(self, callback):
+      self.__callback = callback
+
+   def visit_unit(self, x):
+      result = self.__callback(x)
+      
+      return result if result else x
