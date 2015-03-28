@@ -7,5 +7,5 @@ if __name__ == "__main__":
    
    eq = Reagent(CO) == Product(Molecule(C)) + Product(Molecule(O, O))
 
-   print(eq)
+   print(Grams(CO, 20))
    
