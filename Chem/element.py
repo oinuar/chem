@@ -1,6 +1,13 @@
+from itertools import izip_longest, chain
 
 class Element:
-   pass
+   def __init__(self):
+      raise NotImplementedError()
+
+   def __iter__(self):
+      # This makes Molecule and Element appear the same,
+      # so they can be used through the same interface.
+      yield self
 
 class KnownElement(Element):
    def __init__(self, z):
@@ -12,8 +19,8 @@ class KnownElement(Element):
    
    @property
    def mass(self):
-      return ElementZLookup[self.Z]["AtomicWeight"]
-   
+      return PeriodicTable[self.Z]["AtomicWeight"]
+
    def __hash__(self):
       return hash(self.Z)
    
@@ -49,12 +56,47 @@ class KnownElement(Element):
    
    def __str__(self):
       try:
-         return ElementZLookup[self.Z]["Symbol"]
+         return PeriodicTable[self.Z]["Symbol"]
       except KeyError:
          return "Z({0})".format(self.Z)
 
    def __repr__(self):
       return str(self)
+
+def Molecule(*args):
+   if not args:
+      raise ValueError("Expected elements or a molecule")
+   
+   args = list(args)
+   
+   for x in args:
+      if not isinstance(x, Element):
+         if len(args) == 1 and isinstance(x, ElementMolecule):
+            return x
+
+         raise ValueError("Got '{0}' but expected Element".format(str(x)))
+
+   return ElementMolecule(*args)
+
+class ElementMolecule:
+   def __init__(self, *elements):
+      self.__elements = list(elements)
+
+   @property
+   def mass(self):
+      return sum(x.mass for x in self)
+
+   def __hash__(self):
+      return hash(tuple(self.__elements))
+
+   def __iter__(self):
+      return iter(self.__elements)
+      
+   def __str__(self):
+      return "".join(map(str, self))
+
+   def __repr__(self):
+      return self.__str__()
 
 Elements = {
    "H": KnownElement(1),
@@ -177,7 +219,7 @@ Elements = {
    "Uuo": KnownElement(118)
 }
 
-ElementZLookup = {
+PeriodicTable = {
    1: {"Symbol": "H", "Group": 1, "Period": 1, "AtomicWeight": 1.008},
    2: {"Symbol": "He", "Group": 18, "Period": 1, "AtomicWeight": 4.0026022},
    3: {"Symbol": "Li", "Group": 1, "Period": 2, "AtomicWeight": 6.94},

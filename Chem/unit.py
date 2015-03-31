@@ -1,17 +1,18 @@
-from molecule import Molecule
+from element import Molecule
 from collections import Counter
+from itertools import izip_longest, chain
 
 class Unit:
    def __init__(self, molecule, ratio=1):
-      self.__molecule = molecule
-      self.__n = ratio
-      
-      if not isinstance(self.__n, int):
+      if not isinstance(ratio, int):
          raise TypeError("'ratio' must be integer")
       
-      if self.__n <= 0:
+      if ratio <= 0:
          raise ValueError("'ratio' cannot be negative or zero")
-      
+
+      self.__molecule = molecule
+      self.__n = ratio
+
    @property
    def ratio(self):
       return self.__n
@@ -20,9 +21,9 @@ class Unit:
    def molecule(self):
       return self.__molecule
       
-   def copy(self, n):
-      return Unit(self.molecule, n)
-      
+   def redefine(self, ratio=1):
+      return Unit(self.molecule, ratio) 
+
    def accept(self, visitor):
       return visitor.visit_unit(self)
    
@@ -40,6 +41,31 @@ class Unit:
    def __repr__(self):
       return repr(map(repr, self))
 
+class CompoundUnit(Unit):
+   def __init__(self, lhs, rhs):
+      self.__lhs = lhs
+      self.__rhs = rhs
+   
+   @property
+   def left(self):
+      return self.__lhs
+      
+   @property
+   def right(self):
+      return self.__rhs
+
+   def accept(self, visitor):
+      return visitor.visit_compound_unit(self)
+      
+   def __iter__(self):
+      return chain(self.left, self.right)
+
+   def __str__(self):
+      return "{0} + {1}".format(str(self.left), str(self.right))
+
+   def __repr__(self):
+      return "{0} + {1}".format(repr(self.left), repr(self.right))
+
 class Reagent(Unit):
    def __init__(self, *args, **kwargs):
       Unit.__init__(self, *args, **kwargs)
@@ -47,9 +73,9 @@ class Reagent(Unit):
    def accept(self, visitor):
       return visitor.visit_reagent(self)
       
-   def copy(self, n):
-      return Reagent(self.molecule, n)
-      
+   def redefine(self, ratio=1):
+      return Reagent(self.molecule, ratio) 
+
    def __add__(self, x):
       if not isinstance(x, Reagent):
          return NotImplemented
@@ -62,28 +88,12 @@ class Reagent(Unit):
       
       return Equation(self, x)
 
-class CompoundReagent(Reagent):
+class CompoundReagent(CompoundUnit, Reagent):
    def __init__(self, lhs, rhs):
-      Reagent.__init__(self, Molecule(*(list(lhs) + list(rhs))))
-      self.__lhs = lhs
-      self.__rhs = rhs
-   
-   @property
-   def left(self):
-      return self.__lhs
-   
-   @property
-   def right(self):
-      return self.__rhs
-   
+      CompoundUnit.__init__(self, lhs, rhs)
+
    def accept(self, visitor):
       return visitor.visit_compound_reagent(self)
-      
-   def __str__(self):
-      return "{0} + {1}".format(str(self.left), str(self.right))
-
-   def __repr__(self):
-      return "{0} + {1}".format(repr(self.left), repr(self.right))
 
 class Product(Unit):
    def __init__(self, *args, **kwargs):
@@ -92,37 +102,21 @@ class Product(Unit):
    def accept(self, visitor):
       return visitor.visit_product(self)
       
-   def copy(self, n):
-      return Product(self.molecule, n)
-      
+   def redefine(self, ratio=1):
+      return Product(self.molecule, ratio) 
+
    def __add__(self, x):
       if not isinstance(x, Product):
          return NotImplemented
-      
+
       return CompoundProduct(self, x)
 
-class CompoundProduct(Product):
+class CompoundProduct(CompoundUnit, Product):
    def __init__(self, lhs, rhs):
-      Product.__init__(self, Molecule(*(list(lhs) + list(rhs))))
-      self.__lhs = lhs
-      self.__rhs = rhs
-      
-   @property
-   def left(self):
-      return self.__lhs
-   
-   @property
-   def right(self):
-      return self.__rhs
-   
+      CompoundUnit.__init__(self, lhs, rhs)
+
    def accept(self, visitor):
       return visitor.visit_compound_product(self)
-      
-   def __str__(self):
-      return "{0} + {1}".format(str(self.left), str(self.right))
-      
-   def __repr__(self):
-      return "{0} + {1}".format(repr(self.left), repr(self.right))
 
 class Equation:
    def __init__(self, reagent, product):
@@ -168,7 +162,7 @@ class Equation:
          return None
       
       def make_equation_for_assignment(assignment):
-         units = [variable.copy(ratio) for (k, variable, ratio) in assignment]
+         units = [variable.redefine(ratio) for (k, variable, ratio) in assignment]
          reagents = [x for x in units if isinstance(x, Reagent)]
          products = [x for x in units if isinstance(x, Product)]
          
@@ -190,19 +184,10 @@ class Equation:
          raise Exception("Equation '{0}' cannot be balanced".format(str(self)))
       
       return eq
-   
+
    def __bool__(self):
-      reagents = list(self.reagent)
-      products = list(self.product)
-
-      if len(reagents) != len(products):
-         return False
-
-      reagents.sort()
-      products.sort()
-
-      for i in range(0, len(products)):
-         if reagents[i] != products[i]:
+      for (x, y) in izip_longest(sorted(self.reagent), sorted(self.product)):
+         if not x or not y or x != y:
             return False
 
       return True
@@ -220,6 +205,15 @@ class Visitor:
    def visit_unit(self, x):
       return x
    
+   def visit_compound_unit(self, x):
+      lhs = x.left.accept(self)
+      rhs = x.right.accept(self)
+      
+      if lhs != x.left or rhs != x.right:
+         return CompoundUnit(lhs, rhs)
+      
+      return x
+
    def visit_reagent(self, x):
       return self.visit_unit(x)
       

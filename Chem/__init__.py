@@ -1,4 +1,3 @@
-from element import Elements
-from molecule import Molecule
+from element import Elements, Molecule
 from unit import Reagent, Product
 from sieve import *
