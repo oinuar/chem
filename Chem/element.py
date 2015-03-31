@@ -86,6 +86,13 @@ class ElementMolecule:
    def mass(self):
       return sum(x.mass for x in self)
 
+   def __eq__(self, x):
+      for (x, y) in izip_longest(self, x):
+         if x is None or y is None or x != y:
+            return False
+      
+      return True
+
    def __hash__(self):
       return hash(tuple(self.__elements))
 

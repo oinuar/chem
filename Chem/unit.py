@@ -35,6 +35,9 @@ class Unit:
          for x in self.molecule:
             yield x
 
+   def __eq__(self, x):
+      return isinstance(x, Unit) and self.ratio == x.ratio and self.molecule == x.molecule
+
    def __str__(self):
       return "{0}{1}".format(self.ratio if self.ratio != 1 else "", str(self.molecule))
       
@@ -56,6 +59,9 @@ class CompoundUnit(Unit):
 
    def accept(self, visitor):
       return visitor.visit_compound_unit(self)
+
+   def __eq__(self, x):
+      return isinstance(x, CompoundUnit) and self.left == x.left and self.right == x.right
       
    def __iter__(self):
       return chain(self.left, self.right)
@@ -131,6 +137,20 @@ class Equation:
    def product(self):
       return self.__product
    
+   def __getitem__(self, molecule):
+      molecule = Molecule(molecule)
+   
+      return self.__find(molecule, self.reagent) or self.__find(molecule, self.product)
+   
+   def __find(self, molecule, x):
+      if isinstance(x, CompoundUnit):
+         return self.__find(molecule, x.left) or self.__find(molecule, x.right)
+      
+      if isinstance(x, Unit) and x.molecule == molecule:
+         return x
+      
+      return None
+
    def balance(self):
       variables = []
       variable_set = set()
@@ -194,7 +214,7 @@ class Equation:
 
    def __nonzero__(self):
       return self.__bool__()
-      
+
    def __str__(self):
       return "{0} -> {1}".format(str(self.reagent), str(self.product))
 

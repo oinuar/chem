@@ -16,6 +16,19 @@ class Sieve:
          else:
             self.__contents[x.molecule] = x.moles
 
+   def how_much(self, *molecule):
+      molecule = Molecule(*molecule)
+      unit = self.__eq[molecule]
+      
+      if unit:
+         for (k, v) in self.__contents.items():
+            reference = self.__eq[k]
+            
+            if reference:
+               return v * (unit.ratio / float(reference.ratio))
+
+      raise Exception("Cannot figure out how much '{0}'".format(str(molecule)))
+
    def __add__(self, x):
       if not isinstance(x, self.__class__):
          x = [x]
@@ -70,6 +83,9 @@ class MoleculeUnit:
    def __sub__(self, x):
       return self.__wrap(lambda y: self.value - y, x)
 
+   def __mul__(self, x):
+      return self.__wrap(lambda y: self.value * y, x)
+      
    def __div__(self, x):
       return self.__wrap(lambda y: self.value / y, x)
 
