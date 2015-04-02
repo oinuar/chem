@@ -4,29 +4,17 @@ from itertools import izip_longest, chain
 
 class Unit:
    def __init__(self, molecule, ratio=1):
-      if not isinstance(ratio, int):
-         raise TypeError("'ratio' must be integer")
-      
-      if ratio <= 0:
-         raise ValueError("'ratio' cannot be negative or zero")
-
       self.__molecule = molecule
-      self.__n = ratio
-
-   @property
-   def ratio(self):
-      return self.__n
-
+      self.__ratio = ratio
+   
    @property
    def molecule(self):
       return self.__molecule
-      
-   def redefine(self, ratio=1):
-      return Unit(self.molecule, ratio) 
-
-   def accept(self, visitor):
-      return visitor.visit_unit(self)
    
+   @property
+   def ratio(self):
+      return self.__ratio
+
    def __hash__(self):
       return hash(tuple(self))
    
@@ -42,13 +30,75 @@ class Unit:
       return "{0}{1}".format(self.ratio if self.ratio != 1 else "", str(self.molecule))
       
    def __repr__(self):
-      return repr(map(repr, self))
+      return self.__str__()
 
-class CompoundUnit(Unit):
+class Reagent:
+   def __init__(self, *args, **kwargs):
+      self.__unit = Unit(*args, **kwargs)
+
+   @property
+   def unit(self):
+      return self.__unit
+
+   def copy(self, *args, **kwargs):
+      return Reagent(self.unit.molecule, *args, **kwargs)
+      
+   def __eq__(self, x):
+      if isinstance(x, Product):
+         return Equation(self, x)
+
+      return NotImplemented
+
+   def __add__(self, x):
+      if isinstance(x, Reagent):
+         return CompoundReagent(self, x)
+      
+      return NotImplemented
+
+   def __iter__(self):
+      return iter(self.unit)
+      
+   def __str__(self):
+      return str(self.unit)
+
+   def __repr__(self):
+      return "Reagent({0})".format(repr(self.unit))
+      
+class Product:
+   def __init__(self, *args, **kwargs):
+      self.__unit = Unit(*args, **kwargs)
+
+   @property
+   def unit(self):
+      return self.__unit
+
+   def copy(self, *args, **kwargs):
+      return Product(self.unit.molecule, *args, **kwargs)
+      
+   def __add__(self, x):
+      if isinstance(x, Product):
+         return CompoundProduct(self, x)
+      
+      return NotImplemented
+
+   def __iter__(self):
+      return iter(self.unit)
+
+   def __str__(self):
+      return str(self.unit)
+
+   def __repr__(self):
+      return "Product({0})".format(repr(self.unit))
+      
+class CompoundReagent(Reagent):
    def __init__(self, lhs, rhs):
       self.__lhs = lhs
       self.__rhs = rhs
-   
+
+   @property
+   def unit(self):
+      return None
+
    @property
    def left(self):
       return self.__lhs
@@ -57,72 +107,40 @@ class CompoundUnit(Unit):
    def right(self):
       return self.__rhs
 
-   def accept(self, visitor):
-      return visitor.visit_compound_unit(self)
+   def __iter__(self):
+      return chain(iter(self.left), iter(self.right))
+      
+   def __str__(self):
+      return "{0} + {1}".format(str(self.left), str(self.right))
+      
+   def __repr__(self):
+      return "{0} + {1}".format(repr(self.left), repr(self.right))
 
-   def __eq__(self, x):
-      return isinstance(x, CompoundUnit) and self.left == x.left and self.right == x.right
+class CompoundProduct(Product):
+   def __init__(self, lhs, rhs):
+      self.__lhs = lhs
+      self.__rhs = rhs
+
+   @property
+   def unit(self):
+      return None
+
+   @property
+   def left(self):
+      return self.__lhs
+      
+   @property
+   def right(self):
+      return self.__rhs
       
    def __iter__(self):
-      return chain(self.left, self.right)
-
+      return chain(iter(self.left), iter(self.right))
+      
    def __str__(self):
       return "{0} + {1}".format(str(self.left), str(self.right))
 
    def __repr__(self):
       return "{0} + {1}".format(repr(self.left), repr(self.right))
-
-class Reagent(Unit):
-   def __init__(self, *args, **kwargs):
-      Unit.__init__(self, *args, **kwargs)
-
-   def accept(self, visitor):
-      return visitor.visit_reagent(self)
-      
-   def redefine(self, ratio=1):
-      return Reagent(self.molecule, ratio) 
-
-   def __add__(self, x):
-      if not isinstance(x, Reagent):
-         return NotImplemented
-      
-      return CompoundReagent(self, x)
-      
-   def __eq__(self, x):
-      if not isinstance(x, Product):
-         return NotImplemented
-      
-      return Equation(self, x)
-
-class CompoundReagent(CompoundUnit, Reagent):
-   def __init__(self, lhs, rhs):
-      CompoundUnit.__init__(self, lhs, rhs)
-
-   def accept(self, visitor):
-      return visitor.visit_compound_reagent(self)
-
-class Product(Unit):
-   def __init__(self, *args, **kwargs):
-      Unit.__init__(self, *args, **kwargs)
-   
-   def accept(self, visitor):
-      return visitor.visit_product(self)
-      
-   def redefine(self, ratio=1):
-      return Product(self.molecule, ratio) 
-
-   def __add__(self, x):
-      if not isinstance(x, Product):
-         return NotImplemented
-
-      return CompoundProduct(self, x)
-
-class CompoundProduct(CompoundUnit, Product):
-   def __init__(self, lhs, rhs):
-      CompoundUnit.__init__(self, lhs, rhs)
-
-   def accept(self, visitor):
-      return visitor.visit_compound_product(self)
 
 class Equation:
    def __init__(self, reagent, product):
@@ -143,10 +161,10 @@ class Equation:
       return self.__find(molecule, self.reagent) or self.__find(molecule, self.product)
    
    def __find(self, molecule, x):
-      if isinstance(x, CompoundUnit):
+      if isinstance(x, CompoundReagent) or isinstance(x, CompoundProduct):
          return self.__find(molecule, x.left) or self.__find(molecule, x.right)
       
-      if isinstance(x, Unit) and x.molecule == molecule:
+      if (isinstance(x, Product) or isinstance(x, Reagent)) and x.unit.molecule == molecule:
          return x
       
       return None
@@ -157,10 +175,16 @@ class Equation:
       domain = set()
    
       def collector(x):
-         variables.append(x)
-         domain.add(x.ratio)
-         domain.update(Counter(x).values())
-   
+         if isinstance(x, CompoundReagent) or isinstance(x, CompoundProduct):
+            collector(x.left)
+            collector(x.right)
+            return
+         
+         if isinstance(x, Reagent) or isinstance(x, Product):
+            variables.append(x)
+            domain.add(x.unit.ratio)
+            domain.update(Counter(x).values())
+      
       def backtrace(assignment):
          eq = make_equation_for_assignment(assignment)
       
@@ -182,7 +206,7 @@ class Equation:
          return None
       
       def make_equation_for_assignment(assignment):
-         units = [variable.redefine(ratio) for (k, variable, ratio) in assignment]
+         units = [variable.copy(ratio) for (k, variable, ratio) in assignment]
          reagents = [x for x in units if isinstance(x, Reagent)]
          products = [x for x in units if isinstance(x, Product)]
          
@@ -191,10 +215,8 @@ class Equation:
 
          return Equation(reduce(CompoundReagent, reagents), reduce(CompoundProduct, products))
       
-      visitor = UnitVisitor(collector)
-      
-      self.reagent.accept(visitor)
-      self.product.accept(visitor)
+      collector(self.reagent)
+      collector(self.product)
       
       variable_set.update(x for x in range(0, len(variables)))
       
@@ -220,49 +242,3 @@ class Equation:
 
    def __repr__(self):
       return "{0} -> {1}".format(repr(self.reagent), repr(self.product))
-
-class Visitor:
-   def visit_unit(self, x):
-      return x
-   
-   def visit_compound_unit(self, x):
-      lhs = x.left.accept(self)
-      rhs = x.right.accept(self)
-      
-      if lhs != x.left or rhs != x.right:
-         return CompoundUnit(lhs, rhs)
-      
-      return x
-
-   def visit_reagent(self, x):
-      return self.visit_unit(x)
-      
-   def visit_compound_reagent(self, x):
-      lhs = x.left.accept(self)
-      rhs = x.right.accept(self)
-      
-      if lhs != x.left or rhs != x.right:
-         return CompoundReagent(lhs, rhs)
-      
-      return x
-   
-   def visit_product(self, x):
-      return self.visit_unit(x)
-   
-   def visit_compound_product(self, x):
-      lhs = x.left.accept(self)
-      rhs = x.right.accept(self)
-      
-      if lhs != x.left or rhs != x.right:
-         return CompoundProduct(lhs, rhs)
-      
-      return x
-      
-class UnitVisitor(Visitor):
-   def __init__(self, callback):
-      self.__callback = callback
-
-   def visit_unit(self, x):
-      result = self.__callback(x)
-      
-      return result if result else x

@@ -88,7 +88,7 @@ class ElementMolecule:
 
    def __eq__(self, x):
       for (x, y) in izip_longest(self, x):
-         if x is None or y is None or x != y:
+         if not x or not y or x != y:
             return False
       
       return True
@@ -104,6 +104,52 @@ class ElementMolecule:
 
    def __repr__(self):
       return self.__str__()
+
+class Ion:
+   def __init__(self, *molecule):
+      self.__molecule = Molecule(*molecule)
+
+   @property
+   def molecule(self):
+      return self.__molecule
+      
+   def __iter__(self):
+      return iter(self.__molecule)
+
+   def __eq__(self, x):
+      return isinstance(x, self.__class__) and x.molecule == self.molecule
+
+   def __str__(self):
+      return str(self.__molecule)
+      
+   def __repr__(self):
+      return repr(self.__molecule)
+      
+class Cation(Ion):
+   def __init__(self, *args, **kwargs):
+      Ion.__init__(self, *args, **kwargs)
+
+   def __hash__(self):
+      return Ion.__hash__(self) ^ hash("+")
+
+   def __str__(self):
+      return Ion.__str__(self) + "+"
+      
+   def __repr__(self):
+      return Ion.__repr__(self) + "+"
+
+class Anion(Ion):
+   def __init__(self, *args, **kwargs):
+      Ion.__init__(self, *args, **kwargs)
+
+   def __hash__(self):
+      return Ion.__hash__(self) ^ hash("-")
+
+   def __str__(self):
+      return Ion.__str__(self) + "-"
+      
+   def __repr__(self):
+      return Ion.__repr__(self) + "-"
 
 Elements = {
    "H": KnownElement(1),

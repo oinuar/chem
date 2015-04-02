@@ -1,21 +1,12 @@
 from Chem import *
 
 if __name__ == "__main__":
-   C = Elements["C"]
+   Na = Elements["Na"]
    O = Elements["O"]
-   CO = Molecule(C, O)
+   H = Elements["H"]
+   OH = Molecule(O, H)
+   NaOH2 = Molecule(Na, O, H, O, H)
+   H2O = Molecule(H, H, O)
    
-   eq = Reagent(CO) == Product(C) + Product(Molecule(O, O))
+   eq = Reagent(NaOH2) + Reagent(H2O) == Product(Cation(Na)) + Product(Anion(OH)) + Product(H2O)
    
-   print(eq)
-
-   s = Sieve(eq.balance(), 100, Grams(CO, 20))
-   
-   print(s)
-   
-   s += Grams(CO, 70)
-   
-   print(s)
-   
-   print(s[C])
-   print(s[CO])

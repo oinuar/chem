@@ -25,7 +25,7 @@ class Sieve:
             reference = self.__eq[k]
             
             if reference:
-               return v * (unit.ratio / float(reference.ratio))
+               return v.copy(v.moles * (unit.ratio / float(reference.ratio)))
 
       raise Exception("Cannot figure out how much '{0}'".format(str(molecule)))
 
@@ -42,7 +42,7 @@ class Sieve:
          content = self.__contents[molecule]
       except KeyError:
          content = Moles(molecule, 0)
-      
+
       return Concentration(self.__size, content)
 
    def __iter__(self):
