@@ -6,7 +6,9 @@ if __name__ == "__main__":
    H = Elements["H"]
    OH = Molecule(O, H)
    NaOH2 = Molecule(Na, O, H, O, H)
-   H2O = Molecule(H, H, O)
    
-   eq = Reagent(NaOH2) + Reagent(H2O) == Product(Cation(Na)) + Product(Anion(OH)) + Product(H2O)
+   eq = Reagent(NaOH2) == Product(Cation(Na)) + Product(Anion(OH))
+   
+   # 0,010 M = n/V => 0,010 M = n / 11,1 ml => 0,010 M * 11,1 ml
+   s = Sieve(eq.balance(), 5, Moles(Anion(OH), 0.010 * 11.1 * 10**-3))
    

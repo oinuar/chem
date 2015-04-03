@@ -71,7 +71,7 @@ def Molecule(*args):
    
    for x in args:
       if not isinstance(x, Element):
-         if len(args) == 1 and isinstance(x, ElementMolecule):
+         if len(args) == 1 and (isinstance(x, ElementMolecule) or isinstance(x, Ion)):
             return x
 
          raise ValueError("Got '{0}' but expected Element".format(str(x)))
@@ -116,6 +116,9 @@ class Ion:
    def __iter__(self):
       return iter(self.__molecule)
 
+   def __hash__(self):
+      return hash(self.__molecule)
+      
    def __eq__(self, x):
       return isinstance(x, self.__class__) and x.molecule == self.molecule
 

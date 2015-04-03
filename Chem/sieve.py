@@ -25,7 +25,7 @@ class Sieve:
             reference = self.__eq[k]
             
             if reference:
-               return v.copy(v.moles * (unit.ratio / float(reference.ratio)))
+               return v.copy(v.moles * (unit.unit.ratio / float(reference.unit.ratio)))
 
       raise Exception("Cannot figure out how much '{0}'".format(str(molecule)))
 
@@ -97,10 +97,10 @@ class MoleculeUnit:
 
    def __str__(self):
       symbol = self._symbol
-      return "{0} ({1:.3f}{2}{3})".format(str(self.molecule), self.value, " " if symbol else None, symbol)
+      return "{0} ({1:.3e}{2}{3})".format(str(self.molecule), self.value, " " if symbol else None, symbol)
       
    def __repr__(self):
-      return "{0}[{1}]({2:.3f})".format(self.__class__.__name__, str(self.molecule), self.value)
+      return "{0}[{1}]({2:.3e})".format(self.__class__.__name__, str(self.molecule), self.value)
       
 class Moles(MoleculeUnit):
    def __init__(self, *args, **kwargs):
