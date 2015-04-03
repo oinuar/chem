@@ -10,5 +10,5 @@ if __name__ == "__main__":
    eq = Reagent(NaOH2) == Product(Cation(Na)) + Product(Anion(OH))
    
    # 0,010 M = n/V => 0,010 M = n / 11,1 ml => 0,010 M * 11,1 ml
-   s = Sieve(eq.balance(), 5, Moles(Anion(OH), 0.010 * 11.1 * 10**-3))
+   s = Sieve(eq.balance(), 5 * 10**-3, Moles(Anion(OH), 0.010 * 11.1 * 10**-3))
    
