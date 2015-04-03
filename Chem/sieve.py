@@ -31,9 +31,9 @@ class Sieve:
             reference = self.__eq[k]
             
             if reference:
-               return Concentration(self.__size, molecule, v.moles * (unit.unit.ratio / float(reference.unit.ratio)))
+               return Concentration(self.__size, (v.moles * (unit.unit.ratio / float(reference.unit.ratio))).to(molecule))
 
-      return Concentration(self.__size, molecule, self.__contents[molecule])
+      return Concentration(self.__size, self.__contents[molecule])
 
    def __iter__(self):
       return iter(self.__contents.values())
@@ -54,18 +54,21 @@ class MoleculeUnit:
    def value(self):
       return self.__amount
 
-   def copy(self, *args, **kwargs):
-      return MoleculeUnit(*args, **kwargs)
-      
+   def to(self, molecule):
+      return MoleculeUnit(molecule, self.value)
+
+   def copy(self, value):
+      return MoleculeUnit(self.molecule, value)
+
    @property
    def _symbol(self):
       return None
       
    def __wrap(self, op, x):
       if isinstance(x, self.__class__):
-         return self.copy(x.molecule, op(x.value))
+         return self.copy(op(x.value))
 
-      return self.copy(self.molecule, op(x))
+      return self.copy(op(x))
 
    def __add__(self, x):
       return self.__wrap(lambda y: self.value + y, x)
@@ -103,10 +106,13 @@ class Moles(MoleculeUnit):
    @property
    def grams(self):
       return Grams(self.molecule, self.value * self.molecule.mass)
+
+   def to(self, molecule):
+      return Moles(molecule, self.value)
       
-   def copy(self, *args, **kwargs):
-      return Moles(*args, **kwargs)
-      
+   def copy(self, value):
+      return Moles(self.molecule, value)
+
    @property
    def _symbol(self):
       return "mol"
@@ -123,20 +129,23 @@ class Grams(MoleculeUnit):
    def grams(self):
       return self
 
-   def copy(self, *args, **kwargs):
-      return Grams(*args, **kwargs)
+   def to(self, molecule):
+      return Grams(molecule, self.value)
       
+   def copy(self, value):
+      return Grams(self.molecule, value)
+
    @property
    def _symbol(self):
       return "g"
 
 class Concentration:
-   def __init__(self, size, molecule, content):
+   def __init__(self, size, content):
       if size <= 0:
          raise ValueError("'size' cannot be negative or zero")
 
       self.__size = size
-      self.__content = content.copy(molecule, content.value)
+      self.__content = content
 
    @property
    def size(self):
@@ -148,10 +157,10 @@ class Concentration:
 
    @property
    def value(self):
-      return (self.content.moles / self.size).moles.value
+      return (self.content.moles / self.size).value
 
    def __str__(self):
-      return "[{0:.3e} M of {1}]".format(self.value, str(self.content.moles))
+      return "[{0:.3e} M of {1}]".format(self.value, str(self.content))
       
    def __repr__(self):
-      return "Concentration({0:.3e} M, {1})".format(self.value, repr(self.content.moles))
+      return "Concentration({0:.3e} M, {1})".format(self.value, repr(self.content))
